@@ -11,3 +11,7 @@
 
 `monitor --conf <config file>`
 
+
+## Config File
+
+See the example file example.config.yaml
