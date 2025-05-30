@@ -7,3 +7,25 @@ endpoints:
       enabled: true
       routing_key: example-routing-key
       service: example-service
+    slack:
+      enabled: true
+      # use either webhook_url or token/channel combo, not both
+      webhook_url: https://hooks.slack.com/services/example/webhook
+      channel: 'channel id'
+      token: example-slack-token
+  - name: another-endpoint
+    url: https://another.com/api
+    new_block_max_duration: 120s
+    poll_duration: 20s
+    # Pagerduty and Slack configurations can be omitted if you want to use the global settings below
+
+pagerduty:
+  enabled: true
+  routing_key: example-routing-key
+  service: example-service
+slack:
+  enabled: true
+  # use either webhook_url or token/channel combo, not both
+  webhook_url: https://hooks.slack.com/services/example/webhook
+  channel: 'channel id'
+  token: example-slack-token 
