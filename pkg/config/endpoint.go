@@ -11,7 +11,7 @@ import (
 type Endpoint struct {
 	Name                string        `yaml:"name"`
 	URL                 string        `yaml:"url"`
-	NewBlockMaxDuration time.Duration `yaml:"new_block_duration"`
+	NewBlockMaxDuration time.Duration `yaml:"new_block_max_duration"`
 	Pagerduty           Pagerduty     `yaml:"pagerduty"`
 	Slack               Slack         `yaml:"slack"`
 	PollDuration        time.Duration `yaml:"poll_duration"`
@@ -30,11 +30,14 @@ func (e Endpoint) pagerdutyAlert(ctx context.Context, conf *Config, issue string
 }
 
 func (e Endpoint) slackAlert(ctx context.Context, conf *Config, issue string) error {
+	if !e.Slack.Enabled && !conf.Slack.Enabled {
+		return nil // No Slack alerting configured
+	}
 	// Handle Slack, first try the endpoint's Slack configuration, then the global Slack configuration
 	// Webhook is prioritized, but if it's empty, we can use the channel and token
 
 	// Priority Enpoint Slack Webhook URL -> Endpoint Slack Channel/Token -> Global Slack Webhook URL -> Global Slack Channel/Token
-	if len(e.Slack.WebhookURL) != 0 {
+	if e.Slack.Enabled && len(e.Slack.WebhookURL) != 0 {
 		err := slack.PostWebhookContext(ctx, e.Slack.WebhookURL, &slack.WebhookMessage{
 			Text: issue})
 		if err != nil {
@@ -42,7 +45,7 @@ func (e Endpoint) slackAlert(ctx context.Context, conf *Config, issue string) er
 		}
 		return err
 	}
-	if len(e.Slack.Channel) == 0 && len(e.Slack.Token) == 0 && len(conf.Slack.WebhookURL) != 0 {
+	if len(e.Slack.Channel) == 0 && len(e.Slack.Token) == 0 && len(conf.Slack.WebhookURL) != 0 && conf.Slack.Enabled {
 		err := slack.PostWebhookContext(ctx, conf.Slack.WebhookURL, &slack.WebhookMessage{
 			Text: issue})
 		if err != nil {
@@ -52,7 +55,7 @@ func (e Endpoint) slackAlert(ctx context.Context, conf *Config, issue string) er
 	}
 
 	token := e.Slack.Token
-	if len(token) == 0 {
+	if len(token) == 0 || !e.Slack.Enabled {
 		token = conf.Slack.Token
 		if len(token) == 0 {
 			return errors.New("no Slack token provided for alerting")
@@ -60,7 +63,7 @@ func (e Endpoint) slackAlert(ctx context.Context, conf *Config, issue string) er
 	}
 
 	channel := e.Slack.Channel
-	if len(channel) == 0 {
+	if len(channel) == 0 || !e.Slack.Enabled {
 		channel = conf.Slack.Channel
 		if len(channel) == 0 {
 			return errors.New("no Slack channel provided for alerting")

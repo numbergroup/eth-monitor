@@ -10,12 +10,13 @@ import (
 )
 
 type Pagerduty struct {
+	Enabled    bool   `yaml:"enabled"`
 	RoutingKey string `yaml:"routing_key"`
-	Group      string `yaml:"group"`
+	Service    string `yaml:"service"`
 }
 
 func (p Pagerduty) Empty() bool {
-	return p.RoutingKey == ""
+	return p.RoutingKey == "" || !p.Enabled
 }
 
 func (p Pagerduty) RaiseAlert(ctx context.Context, name, issue string) error {
@@ -29,21 +30,21 @@ func (p Pagerduty) RaiseAlert(ctx context.Context, name, issue string) error {
 			Summary:   issue,
 			Severity:  "error",
 			Component: name,
-			Source:    name,
-			Group:     p.Group,
+			Source:    p.Service,
 		},
 	})
 	return err
 }
 
 type Slack struct {
+	Enabled    bool   `yaml:"enabled"`
 	WebhookURL string `yaml:"webhook_url"`
 	Channel    string `yaml:"channel"`
 	Token      string `yaml:"token"`
 }
 
 func (s Slack) Empty() bool {
-	return len(s.WebhookURL) == 0 && len(s.Channel) == 0 && len(s.Token) == 0
+	return !s.Enabled || (len(s.WebhookURL) == 0 && len(s.Channel) == 0 && len(s.Token) == 0)
 }
 
 type Config struct {
@@ -74,5 +75,5 @@ func LoadConfig(file string) (*Config, error) {
 	}
 
 	conf.Log = logger
-	return conf, err
+	return conf, nil
 }

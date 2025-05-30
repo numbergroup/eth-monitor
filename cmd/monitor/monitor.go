@@ -6,6 +6,7 @@ import (
 
 	"github.com/cockroachdb/errors"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/sirupsen/logrus"
 
 	"github.com/numbergroup/eth-monitor/pkg/config"
 )
@@ -67,7 +68,9 @@ func (m *monitor) Run(ctx context.Context) {
 				}
 
 			} else {
-				m.conf.Log.WithField("name", m.endpoint.Name).Info("Endpoint is healthy")
+				m.conf.Log.WithFields(logrus.Fields{
+					"block": m.lastBlockNumber,
+					"name":  m.endpoint.Name}).Info("Endpoint is healthy")
 			}
 		}
 

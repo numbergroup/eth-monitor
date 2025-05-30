@@ -21,24 +21,27 @@ func main() {
 		<-quitCh
 	}()
 
-	confFile := *flag.String("conf", "./config.yaml", "path to the configuration file")
-	conf, err := config.LoadConfig(confFile)
+	confFile := flag.String("conf", "./config.yaml", "path to the configuration file")
+
+	flag.Parse()
+
+	conf, err := config.LoadConfig(*confFile)
 	if err != nil {
 		print(err.Error())
 		os.Exit(1)
 	}
 
 	waitGroup := &sync.WaitGroup{}
-
+	conf.Log.WithField("endpoints", len(conf.Endpoints)).Info("starting monitors")
 	for _, endpoint := range conf.Endpoints {
 		mon, err := NewMonitor(ctx, conf, endpoint)
 		if err != nil {
 			conf.Log.WithError(err).WithField("endpoint", endpoint.Name).Panic("failed to create monitor")
 		}
-
+		waitGroup.Add(1)
 		go func(m *monitor) {
 			m.conf.Log.WithField("name", m.endpoint.Name).Info("starting monitoring")
-			waitGroup.Add(1)
+
 			defer waitGroup.Done()
 			m.Run(ctx)
 		}(mon)
