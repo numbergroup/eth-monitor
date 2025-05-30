@@ -1,0 +1,9 @@
+endpoints:
+  - name: example-endpoint
+    url: https://example.com/api
+    new_block_max_duration: 90s
+    poll_duration: 15s
+    pagerduty:
+      enabled: true
+      routing_key: example-routing-key
+      service: example-service
