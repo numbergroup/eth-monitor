@@ -3,71 +3,120 @@ package alert
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/numbergroup/eth-monitor/pkg/config"
 	"github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 )
 
-func NewSlack(conf *config.Config) Slack {
+func NewSlack(conf *config.Config, endpoint config.Endpoint) Slack {
 	return Slack{
-		Log:        conf.Log,
-		WebhookURL: conf.Slack.WebhookURL,
-		Channel:    conf.Slack.Channel,
-		Token:      conf.Slack.Token,
+		conf:     conf,
+		log:      conf.Log,
+		endpoint: endpoint,
 	}
 }
 
 type Slack struct {
-	Log        logrus.Ext1FieldLogger
-	WebhookURL string
-	Channel    string
-	Token      string
+	conf     *config.Config
+	endpoint config.Endpoint
+	log      logrus.Ext1FieldLogger
 }
 
-// TODO: Include more details, like metadata, severity, etc.
 func (s Slack) Raise(ctx context.Context, msg Message) error {
 	// Handle Slack, first try the endpoint's Slack configuration, then the global Slack configuration
 	// Webhook is prioritized, but if it's empty, we can use the channel and token
 
 	slackMsg := &slack.WebhookMessage{
-		Text: msg.Message}
+		Text: s.formatMessage(msg),
+		Attachments: []slack.Attachment{
+			{
+				Color:  s.severityColor(msg.Severity),
+				Fields: s.buildMetadataFields(msg),
+			},
+		},
+	}
 
-	// Priority Enpoint Slack Webhook URL -> Endpoint Slack Channel/Token -> Global Slack Webhook URL -> Global Slack Channel/Token
-	if len(s.WebhookURL) != 0 {
-		err := slack.PostWebhookContext(ctx, s.WebhookURL, slackMsg)
+	// Priority: Endpoint Webhook -> Endpoint Channel/Token -> Global Webhook -> Global Channel/Token
+
+	// 1. Try endpoint webhook URL first
+	if len(s.endpoint.Slack.WebhookURL) != 0 {
+		err := slack.PostWebhookContext(ctx, s.endpoint.Slack.WebhookURL, slackMsg)
 		if err != nil {
-			s.Log.WithError(err).WithField("endpoint", msg.Name).Error("failed to send Slack alert via webhook")
+			s.log.WithError(err).WithField("endpoint", msg.Name).Error("failed to send Slack alert via endpoint webhook")
 		}
 		return err
 	}
-	if len(s.Channel) == 0 && len(s.Token) == 0 && len(s.WebhookURL) != 0 {
-		err := slack.PostWebhookContext(ctx, s.WebhookURL, slackMsg)
+
+	// 2. Try endpoint channel/token if available
+	if len(s.endpoint.Slack.Channel) != 0 && len(s.endpoint.Slack.Token) != 0 {
+		api := slack.New(s.endpoint.Slack.Token)
+		_, _, err := api.PostMessageContext(ctx, s.endpoint.Slack.Channel,
+			slack.MsgOptionText(s.formatMessage(msg), false),
+			slack.MsgOptionAttachments(slack.Attachment{
+				Color:  s.severityColor(msg.Severity),
+				Fields: s.buildMetadataFields(msg),
+			}),
+		)
 		if err != nil {
-			s.Log.WithError(err).WithField("endpoint", msg.Name).Error("failed to send Slack alert via webhook")
+			s.log.WithError(err).WithField("endpoint", msg.Name).Error("failed to send Slack alert via endpoint channel")
 		}
 		return err
 	}
 
-	token := s.Token
-	if len(token) == 0 {
-		token = s.Token
-		if len(token) == 0 {
-			return errors.New("no Slack token provided for alerting")
+	// 3. Try global webhook URL
+	if len(s.conf.Slack.WebhookURL) != 0 {
+		err := slack.PostWebhookContext(ctx, s.conf.Slack.WebhookURL, slackMsg)
+		if err != nil {
+			s.log.WithError(err).WithField("endpoint", msg.Name).Error("failed to send Slack alert via global webhook")
 		}
+		return err
 	}
 
-	channel := s.Channel
-	if len(channel) == 0 {
-		channel = s.Channel
-		if len(channel) == 0 {
-			return errors.New("no Slack channel provided for alerting")
+	// 4. Try global channel/token as last resort
+	if len(s.conf.Slack.Channel) != 0 && len(s.conf.Slack.Token) != 0 {
+		api := slack.New(s.conf.Slack.Token)
+		_, _, err := api.PostMessageContext(ctx, s.conf.Slack.Channel,
+			slack.MsgOptionText(s.formatMessage(msg), false),
+			slack.MsgOptionAttachments(slack.Attachment{
+				Color:  s.severityColor(msg.Severity),
+				Fields: s.buildMetadataFields(msg),
+			}),
+		)
+		if err != nil {
+			s.log.WithError(err).WithField("endpoint", msg.Name).Error("failed to send Slack alert via global channel")
 		}
+		return err
 	}
-	api := slack.New(s.Token)
-	_, _, err := api.PostMessageContext(ctx, channel, slack.MsgOptionText(msg.Message, false))
-	if err != nil {
-		s.Log.WithError(err).WithField("endpoint", msg.Name).Error("failed to send Slack alert via channel")
+
+	return errors.New("no valid Slack configuration found for alerting")
+}
+
+func (s Slack) formatMessage(msg Message) string {
+	return fmt.Sprintf("[%s] %s: %s", strings.ToUpper(string(msg.Severity)), msg.Name, msg.Message)
+}
+
+func (s Slack) severityColor(severity Severity) string {
+	switch severity {
+	case Error:
+		return "danger"
+	default:
+		return "warning"
 	}
-	return err
+}
+
+func (s Slack) buildMetadataFields(msg Message) []slack.AttachmentField {
+	var fields []slack.AttachmentField
+
+	for key, value := range msg.Metadata {
+		fields = append(fields, slack.AttachmentField{
+			Title: key,
+			Value: fmt.Sprintf("%v", value),
+			Short: true,
+		})
+	}
+
+	return fields
 }

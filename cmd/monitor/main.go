@@ -35,6 +35,10 @@ func main() {
 		if endpoint.Pagerduty.Enabled {
 			alertChannels = append(alertChannels, alert.NewPagerduty(conf, endpoint))
 		}
+		if endpoint.Slack.Enabled {
+			alertChannels = append(alertChannels, alert.NewSlack(conf, endpoint))
+		}
+
 		rpcClient, err := ethclient.DialContext(ctx, endpoint.URL)
 		if err != nil {
 			conf.Log.WithError(err).WithField("endpoint", endpoint.Name).Panic("failed to connect to RPC client")
