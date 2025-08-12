@@ -1,41 +1,40 @@
-package main
+package monitor
 
 import (
 	"context"
 	"time"
 
 	"github.com/cockroachdb/errors"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/sirupsen/logrus"
 
+	"github.com/numbergroup/eth-monitor/pkg/alert"
 	"github.com/numbergroup/eth-monitor/pkg/config"
 )
 
-type monitor struct {
-	endpoint config.Endpoint
-	conf     *config.Config
-	client   *ethclient.Client
-
+type BlockNumberMonitor struct {
+	alertChannels    []alert.Alert
+	conf             *config.Config
+	client           ETHRPC
+	endpoint         config.Endpoint
 	lastBlockNumber  uint64
 	lastNewBlockTime time.Time
+	log              logrus.Ext1FieldLogger
 }
 
-func NewMonitor(ctx context.Context, conf *config.Config, endpoint config.Endpoint) (*monitor, error) {
-	client, err := ethclient.DialContext(ctx, endpoint.URL)
-	if err != nil {
-		return nil, err
-	}
-	return &monitor{
-		endpoint: endpoint,
-		conf:     conf,
-		client:   client,
+func NewBlockNumberMonitor(conf *config.Config, alertChannels []alert.Alert, rpcClient ETHRPC, endpoint config.Endpoint) (Monitor, error) {
+	return &BlockNumberMonitor{
+		alertChannels: alertChannels,
+		conf:          conf,
+		client:        rpcClient,
+		endpoint:      endpoint,
+		log:           conf.Log,
 	}, nil
 }
 
-func (m *monitor) checkNewBlock(ctx context.Context) error {
+func (m *BlockNumberMonitor) checkNewBlock(ctx context.Context) error {
 	blockNumber, err := m.client.BlockNumber(ctx)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to get block number")
 	}
 
 	if blockNumber == m.lastBlockNumber {
@@ -46,6 +45,8 @@ func (m *monitor) checkNewBlock(ctx context.Context) error {
 	}
 
 	if blockNumber < m.lastBlockNumber {
+		m.lastBlockNumber = blockNumber
+		m.lastNewBlockTime = time.Now()
 		return errors.Errorf("block number decreased from %d to %d", m.lastBlockNumber, blockNumber)
 	}
 	m.lastBlockNumber = blockNumber
@@ -53,7 +54,11 @@ func (m *monitor) checkNewBlock(ctx context.Context) error {
 	return nil
 }
 
-func (m *monitor) Run(ctx context.Context) {
+func (m *BlockNumberMonitor) Name() string {
+	return "BlockNumberMonitor::" + m.endpoint.Name
+}
+
+func (m *BlockNumberMonitor) Run(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -62,9 +67,15 @@ func (m *monitor) Run(ctx context.Context) {
 		default:
 			if err := m.checkNewBlock(ctx); err != nil {
 				m.conf.Log.WithError(err).Error("health check failed, raising alert")
-				alertErr := m.endpoint.RaiseAlert(ctx, m.conf, err.Error())
-				if alertErr != nil {
-					m.conf.Log.WithError(alertErr).Error("failed to raise alert")
+				for _, alertChannel := range m.alertChannels {
+					alertErr := alertChannel.Raise(ctx, alert.Message{
+						Message:  err.Error(),
+						Severity: alert.Error,
+						Name:     m.endpoint.Name,
+					})
+					if alertErr != nil {
+						m.conf.Log.WithError(alertErr).Error("failed to raise alert")
+					}
 				}
 
 			} else {

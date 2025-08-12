@@ -7,11 +7,17 @@ import (
 	"github.com/numbergroup/eth-monitor/pkg/config"
 )
 
-func NewPagerduty(conf *config.Config) Pagerduty {
-	return Pagerduty{
-		RoutingKey: conf.Pagerduty.RoutingKey,
-		Service:    conf.Pagerduty.Service,
+func NewPagerduty(conf *config.Config, endpoint config.Endpoint) Pagerduty {
+	out := Pagerduty{
+		Service: endpoint.Pagerduty.Service,
 	}
+	if endpoint.Pagerduty.RoutingKey != "" {
+		out.RoutingKey = endpoint.Pagerduty.RoutingKey
+	} else {
+		out.RoutingKey = conf.Pagerduty.RoutingKey
+	}
+
+	return out
 }
 
 type Pagerduty struct {

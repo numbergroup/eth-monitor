@@ -8,7 +8,11 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/ethereum/go-ethereum/ethclient"
+
+	"github.com/numbergroup/eth-monitor/pkg/alert"
 	"github.com/numbergroup/eth-monitor/pkg/config"
+	"github.com/numbergroup/eth-monitor/pkg/monitor"
 )
 
 func main() {
@@ -34,13 +38,21 @@ func main() {
 	waitGroup := &sync.WaitGroup{}
 	conf.Log.WithField("endpoints", len(conf.Endpoints)).Info("starting monitors")
 	for _, endpoint := range conf.Endpoints {
-		mon, err := NewMonitor(ctx, conf, endpoint)
+		alertChannels := []alert.Alert{}
+		if endpoint.Pagerduty.Enabled {
+			alertChannels = append(alertChannels, alert.NewPagerduty(conf, endpoint))
+		}
+		rpcClient, err := ethclient.DialContext(ctx, endpoint.URL)
+		if err != nil {
+			conf.Log.WithError(err).WithField("endpoint", endpoint.Name).Panic("failed to connect to RPC client")
+		}
+		mon, err := monitor.NewBlockNumberMonitor(conf, alertChannels, rpcClient, endpoint)
 		if err != nil {
 			conf.Log.WithError(err).WithField("endpoint", endpoint.Name).Panic("failed to create monitor")
 		}
 		waitGroup.Add(1)
-		go func(m *monitor) {
-			m.conf.Log.WithField("name", m.endpoint.Name).Info("starting monitoring")
+		go func(m monitor.Monitor) {
+			conf.Log.WithField("name", m.Name()).Info("starting monitoring")
 
 			defer waitGroup.Done()
 			m.Run(ctx)

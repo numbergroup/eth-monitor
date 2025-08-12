@@ -1,10 +1,9 @@
 package config
 
 import (
-	"context"
 	"os"
+	"time"
 
-	"github.com/PagerDuty/go-pagerduty"
 	"github.com/goccy/go-yaml"
 	"github.com/sirupsen/logrus"
 )
@@ -17,23 +16,6 @@ type Pagerduty struct {
 
 func (p Pagerduty) Empty() bool {
 	return p.RoutingKey == "" || !p.Enabled
-}
-
-func (p Pagerduty) RaiseAlert(ctx context.Context, name, issue string) error {
-	if p.Empty() {
-		return nil
-	}
-	_, err := pagerduty.ManageEventWithContext(ctx, pagerduty.V2Event{
-		RoutingKey: p.RoutingKey,
-		Action:     "trigger",
-		Payload: &pagerduty.V2Payload{
-			Summary:   issue,
-			Severity:  "error",
-			Component: name,
-			Source:    p.Service,
-		},
-	})
-	return err
 }
 
 type Slack struct {
@@ -76,4 +58,13 @@ func LoadConfig(file string) (*Config, error) {
 
 	conf.Log = logger
 	return conf, nil
+}
+
+type Endpoint struct {
+	Name                string        `yaml:"name"`
+	URL                 string        `yaml:"url"`
+	NewBlockMaxDuration time.Duration `yaml:"new_block_max_duration"`
+	Pagerduty           Pagerduty     `yaml:"pagerduty"`
+	Slack               Slack         `yaml:"slack"`
+	PollDuration        time.Duration `yaml:"poll_duration"`
 }
