@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"sync"
-	"syscall"
 
 	"github.com/ethereum/go-ethereum/ethclient"
 
@@ -16,14 +15,8 @@ import (
 )
 
 func main() {
-	quitCh := make(chan os.Signal, 1)
-	signal.Notify(quitCh, syscall.SIGINT, syscall.SIGTERM)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		defer cancel()
-		<-quitCh
-	}()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
 
 	confFile := flag.String("conf", "./config.yaml", "path to the configuration file")
 
@@ -62,5 +55,4 @@ func main() {
 
 	waitGroup.Wait()
 	conf.Log.Info("all monitors stopped, exiting")
-	cancel() // Ensure context is cancelled to stop all goroutines gracefully
 }
