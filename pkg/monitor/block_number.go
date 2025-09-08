@@ -11,6 +11,10 @@ import (
 	"github.com/numbergroup/eth-monitor/pkg/config"
 )
 
+type RPCBlockNumber interface {
+	BlockNumber(ctx context.Context) (uint64, error)
+}
+
 type BlockNumberMonitor struct {
 	alertChannels    []alert.Alert
 	conf             *config.Config
@@ -21,7 +25,7 @@ type BlockNumberMonitor struct {
 	log              logrus.Ext1FieldLogger
 }
 
-func NewBlockNumberMonitor(conf *config.Config, alertChannels []alert.Alert, rpcClient ETHRPC, endpoint config.Endpoint) (Monitor, error) {
+func NewBlockNumberMonitor(conf *config.Config, alertChannels []alert.Alert, rpcClient RPCBlockNumber, endpoint config.Endpoint) (Monitor, error) {
 	return &BlockNumberMonitor{
 		alertChannels: alertChannels,
 		conf:          conf,

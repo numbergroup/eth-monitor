@@ -55,6 +55,21 @@ func main() {
 			m.Run(ctx)
 		}(mon)
 
+		// Start PeerCount monitor if configured
+		if endpoint.MinPeers > 0 {
+			peerMon, err := monitor.NewPeerCountMonitor(conf, alertChannels, rpcClient, endpoint)
+			if err != nil {
+				conf.Log.WithError(err).WithField("endpoint", endpoint.Name).Panic("failed to create peer monitor")
+			}
+			waitGroup.Add(1)
+			go func(m monitor.Monitor) {
+				conf.Log.WithField("name", m.Name()).Info("starting monitoring")
+
+				defer waitGroup.Done()
+				m.Run(ctx)
+			}(peerMon)
+		}
+
 	}
 
 	waitGroup.Wait()

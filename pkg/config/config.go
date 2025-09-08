@@ -61,10 +61,11 @@ func LoadConfig(file string) (*Config, error) {
 }
 
 type Endpoint struct {
-	Name                string        `yaml:"name"`
-	URL                 string        `yaml:"url"`
-	NewBlockMaxDuration time.Duration `yaml:"new_block_max_duration"`
-	Pagerduty           Pagerduty     `yaml:"pagerduty"`
-	Slack               Slack         `yaml:"slack"`
-	PollDuration        time.Duration `yaml:"poll_duration"`
+    Name                string        `yaml:"name"`
+    URL                 string        `yaml:"url"`
+    NewBlockMaxDuration time.Duration `yaml:"new_block_max_duration"`
+    MinPeers            int           `yaml:"min_peers"`
+    Pagerduty           Pagerduty     `yaml:"pagerduty"`
+    Slack               Slack         `yaml:"slack"`
+    PollDuration        time.Duration `yaml:"poll_duration"`
 }
