@@ -42,19 +42,68 @@ func TestPeerCount_OK(t *testing.T) {
     if m.lastPeerCount != 8 {
         t.Fatalf("expected lastPeerCount=8, got %d", m.lastPeerCount)
     }
+    // Since 8 > 5+2, the monitor should consider we've been above min at least once
+    if !m.hasEverBeenAboveMin {
+        t.Fatalf("expected hasEverBeenAboveMin=true, got false")
+    }
 }
 
-func TestPeerCount_BelowThreshold_Error(t *testing.T) {
+func TestPeerCount_BelowThreshold_NoErrorBeforeEverAbove(t *testing.T) {
     rpc := &fakePeerRPC{ret: 2}
     ep := config.Endpoint{MinPeers: 3}
     m := newPeerTestMonitor(t, rpc, ep)
 
     err := m.checkPeerCount(context.Background())
+    if err != nil {
+        t.Fatalf("expected no error before ever being above min, got %v", err)
+    }
+    if m.hasEverBeenAboveMin {
+        t.Fatalf("expected hasEverBeenAboveMin=false at startup, got true")
+    }
+}
+
+func TestPeerCount_AlertsAfterEverAboveAndThenBelow(t *testing.T) {
+    rpc := &fakePeerRPC{ret: 7}
+    ep := config.Endpoint{MinPeers: 3}
+    m := newPeerTestMonitor(t, rpc, ep)
+
+    // First, go above MinPeers+2 to set the flag
+    if err := m.checkPeerCount(context.Background()); err != nil {
+        t.Fatalf("unexpected error on initial high peer count: %v", err)
+    }
+    if !m.hasEverBeenAboveMin {
+        t.Fatalf("expected hasEverBeenAboveMin=true after high peer count")
+    }
+
+    // Now drop below MinPeers and expect an alert
+    rpc.ret = 2
+    err := m.checkPeerCount(context.Background())
     if err == nil {
-        t.Fatal("expected error when below threshold, got nil")
+        t.Fatal("expected error when below threshold after having been above, got nil")
     }
     if !strings.Contains(err.Error(), "below minimum") {
         t.Fatalf("unexpected error: %v", err)
+    }
+}
+
+func TestPeerCount_EqualPlusTwo_DoesNotFlipFlag(t *testing.T) {
+    // If peer count is exactly MinPeers+2, flag should remain false
+    min := 5
+    rpc := &fakePeerRPC{ret: uint64(min + 2)}
+    ep := config.Endpoint{MinPeers: min}
+    m := newPeerTestMonitor(t, rpc, ep)
+
+    if err := m.checkPeerCount(context.Background()); err != nil {
+        t.Fatalf("unexpected error on boundary: %v", err)
+    }
+    if m.hasEverBeenAboveMin {
+        t.Fatalf("expected hasEverBeenAboveMin=false at boundary, got true")
+    }
+
+    // And still should not alert if below since we've never been above
+    rpc.ret = uint64(min - 1)
+    if err := m.checkPeerCount(context.Background()); err != nil {
+        t.Fatalf("expected suppressed error before ever-above, got %v", err)
     }
 }
 
@@ -80,4 +129,3 @@ func TestPeerCount_Name(t *testing.T) {
         t.Fatalf("unexpected name got %q want %q", got, want)
     }
 }
-
