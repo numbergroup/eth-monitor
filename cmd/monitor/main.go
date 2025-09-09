@@ -7,11 +7,9 @@ import (
 	"os/signal"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/ethclient"
-
 	"github.com/numbergroup/eth-monitor/pkg/alert"
 	"github.com/numbergroup/eth-monitor/pkg/config"
-	"github.com/numbergroup/eth-monitor/pkg/monitor"
+	"github.com/numbergroup/eth-monitor/pkg/monitor/execution"
 )
 
 func main() {
@@ -39,35 +37,14 @@ func main() {
 			alertChannels = append(alertChannels, alert.NewSlack(conf, endpoint))
 		}
 
-		rpcClient, err := ethclient.DialContext(ctx, endpoint.URL)
-		if err != nil {
-			conf.Log.WithError(err).WithField("endpoint", endpoint.Name).Panic("failed to connect to RPC client")
-		}
-		mon, err := monitor.NewBlockNumberMonitor(conf, alertChannels, rpcClient, endpoint)
-		if err != nil {
-			conf.Log.WithError(err).WithField("endpoint", endpoint.Name).Panic("failed to create monitor")
-		}
-		waitGroup.Add(1)
-		go func(m monitor.Monitor) {
-			conf.Log.WithField("name", m.Name()).Info("starting monitoring")
-
-			defer waitGroup.Done()
-			m.Run(ctx)
-		}(mon)
-
-		// Start PeerCount monitor if configured
-		if endpoint.MinPeers > 0 {
-			peerMon, err := monitor.NewPeerCountMonitor(conf, alertChannels, rpcClient, endpoint)
+		switch endpoint.Type {
+		case config.TypeExecution:
+			err := execution.RunMonitors(ctx, waitGroup, conf, endpoint, alertChannels)
 			if err != nil {
-				conf.Log.WithError(err).WithField("endpoint", endpoint.Name).Panic("failed to create peer monitor")
+				conf.Log.WithError(err).WithField("endpoint", endpoint.Name).Panic("failed to run monitors")
 			}
-			waitGroup.Add(1)
-			go func(m monitor.Monitor) {
-				conf.Log.WithField("name", m.Name()).Info("starting monitoring")
-
-				defer waitGroup.Done()
-				m.Run(ctx)
-			}(peerMon)
+		case config.TypeConsensus:
+			// TODO
 		}
 
 	}

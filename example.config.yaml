@@ -4,6 +4,7 @@ endpoints:
     new_block_max_duration: 90s
     min_peers: 5
     poll_duration: 15s
+    type: execution
     pagerduty:
       enabled: true
       routing_key: example-routing-key
@@ -14,7 +15,8 @@ endpoints:
       webhook_url: https://hooks.slack.com/services/example/webhook
       channel: 'channel id'
       token: example-slack-token
-  - name: another-endpoint
+  - name: another-consensus-endpoint
+    type: consensus
     url: https://another.com/api
     new_block_max_duration: 120s
     min_peers: 3
