@@ -121,7 +121,7 @@ func TestName_Format(t *testing.T) {
 	m := newTestMonitor(t, rpc, ep)
 
 	got := m.Name()
-	want := "BlockNumberMonitor::example"
+	want := "execution::BlockNumberMonitor::example"
 	if got != want {
 		t.Fatalf("unexpected name, got %q want %q", got, want)
 	}

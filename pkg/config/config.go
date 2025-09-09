@@ -10,8 +10,9 @@ import (
 )
 
 const (
-	TypeExecution = "execution"
-	TypeConsensus = "consensus"
+	TypeExecution          = "execution"
+	TypeConsensus          = "consensus"
+	PeerStartThreshold int = 2
 )
 
 type Pagerduty struct {
@@ -36,10 +37,11 @@ func (s Slack) Empty() bool {
 }
 
 type Config struct {
-	Endpoints []Endpoint `yaml:"endpoints"`
-	Pagerduty Pagerduty  `yaml:"pagerduty"`
-	Slack     Slack      `yaml:"slack"`
-	Verbosity string     `yaml:"verbosity"`
+	Endpoints  []Endpoint    `yaml:"endpoints"`
+	RPCTimeout time.Duration `yaml:"rpc_timeout"`
+	Pagerduty  Pagerduty     `yaml:"pagerduty"`
+	Slack      Slack         `yaml:"slack"`
+	Verbosity  string        `yaml:"verbosity"`
 
 	Log logrus.Ext1FieldLogger `yaml:"-"` // Log field is not serialized to YAML, used for logging
 }
@@ -63,6 +65,9 @@ func LoadConfig(file string) (*Config, error) {
 	}
 
 	conf.Log = logger
+	if conf.RPCTimeout == 0 {
+		conf.RPCTimeout = 10 * time.Second
+	}
 	return conf, nil
 }
 

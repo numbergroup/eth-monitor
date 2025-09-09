@@ -29,5 +29,20 @@ func RunMonitors(ctx context.Context, waitGroup *sync.WaitGroup, conf *config.Co
 		}()
 	}
 
+	if endpoint.MinPeers > 0 {
+		waitGroup.Add(1)
+		go func() {
+			mon, err := NewPeerCountMonitor(conf, alertChannels, endpoint)
+			if err != nil {
+				conf.Log.WithError(err).WithField("endpoint", endpoint.Name).Error("failed to create peer count monitor")
+				return
+			}
+			conf.Log.WithField("name", mon.Name()).Info("peer count monitoring started")
+
+			defer waitGroup.Done()
+			mon.Run(ctx)
+		}()
+	}
+
 	return nil
 }

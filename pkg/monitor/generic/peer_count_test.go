@@ -1,4 +1,4 @@
-package execution
+package generic
 
 import (
 	"context"
@@ -10,6 +10,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type assertErr struct{}
+
+func (assertErr) Error() string { return "boom" }
+
 type fakePeerRPC struct {
 	ret uint64
 	err error
@@ -20,7 +24,7 @@ func (f *fakePeerRPC) PeerCount(ctx context.Context) (uint64, error) { return f.
 func newPeerTestMonitor(t *testing.T, rpc RPCPeerCount, ep config.Endpoint) *PeerCountMonitor {
 	t.Helper()
 	conf := &config.Config{Log: logrus.New()}
-	mon, err := NewPeerCountMonitor(conf, nil, rpc, ep)
+	mon, err := NewPeerCountMonitor(conf, nil, rpc, ep, config.TypeExecution)
 	if err != nil {
 		t.Fatalf("failed to create monitor: %v", err)
 	}
@@ -125,7 +129,7 @@ func TestPeerCount_Name(t *testing.T) {
 	rpc := &fakePeerRPC{ret: 5}
 	ep := config.Endpoint{Name: "example"}
 	m := newPeerTestMonitor(t, rpc, ep)
-	if got, want := m.Name(), "PeerCountMonitor::example"; got != want {
+	if got, want := m.Name(), "execution::PeerCountMonitor::example"; got != want {
 		t.Fatalf("unexpected name got %q want %q", got, want)
 	}
 }
