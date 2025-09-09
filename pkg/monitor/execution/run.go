@@ -8,6 +8,7 @@ import (
 
 	"github.com/numbergroup/eth-monitor/pkg/alert"
 	"github.com/numbergroup/eth-monitor/pkg/config"
+	"github.com/numbergroup/eth-monitor/pkg/monitor"
 )
 
 func RunMonitors(ctx context.Context, waitGroup *sync.WaitGroup, conf *config.Config, endpoint config.Endpoint, alertChannels []alert.Alert) error {
@@ -22,7 +23,7 @@ func RunMonitors(ctx context.Context, waitGroup *sync.WaitGroup, conf *config.Co
 		return err
 	}
 	waitGroup.Add(1)
-	go func(m Monitor) {
+	go func(m monitor.Monitor) {
 		conf.Log.WithField("name", m.Name()).Info("block number monitoring started")
 
 		defer waitGroup.Done()
@@ -37,7 +38,7 @@ func RunMonitors(ctx context.Context, waitGroup *sync.WaitGroup, conf *config.Co
 			return err
 		}
 		waitGroup.Add(1)
-		go func(m Monitor) {
+		go func(m monitor.Monitor) {
 			conf.Log.WithField("name", m.Name()).Info("peer count monitoring started")
 
 			defer waitGroup.Done()

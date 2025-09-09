@@ -9,6 +9,7 @@ import (
 
 	"github.com/numbergroup/eth-monitor/pkg/alert"
 	"github.com/numbergroup/eth-monitor/pkg/config"
+	"github.com/numbergroup/eth-monitor/pkg/monitor/consensus"
 	"github.com/numbergroup/eth-monitor/pkg/monitor/execution"
 )
 
@@ -44,7 +45,10 @@ func main() {
 				conf.Log.WithError(err).WithField("endpoint", endpoint.Name).Panic("failed to run monitors")
 			}
 		case config.TypeConsensus:
-			// TODO
+			err := consensus.RunMonitors(ctx, waitGroup, conf, endpoint, alertChannels)
+			if err != nil {
+				conf.Log.WithError(err).WithField("endpoint", endpoint.Name).Panic("failed to run monitors")
+			}
 		}
 
 	}

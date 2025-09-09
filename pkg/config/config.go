@@ -4,8 +4,14 @@ import (
 	"os"
 	"time"
 
+	"github.com/cockroachdb/errors"
 	"github.com/goccy/go-yaml"
 	"github.com/sirupsen/logrus"
+)
+
+const (
+	TypeExecution = "execution"
+	TypeConsensus = "consensus"
 )
 
 type Pagerduty struct {
@@ -71,7 +77,20 @@ type Endpoint struct {
 	PollDuration        time.Duration `yaml:"poll_duration"`
 }
 
-const (
-	TypeExecution = "execution"
-	TypeConsensus = "consensus"
-)
+func (e Endpoint) Validate() error {
+	if len(e.Name) == 0 {
+		return errors.New("endpoint name is required")
+	}
+	if len(e.URL) == 0 {
+		return errors.New("endpoint URL is required")
+	}
+
+	switch e.Type {
+	case TypeExecution:
+	case TypeConsensus:
+	default:
+		return errors.Errorf("invalid endpoint type: %s", e.Type)
+	}
+
+	return nil
+}

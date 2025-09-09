@@ -9,6 +9,7 @@ import (
 
 	"github.com/numbergroup/eth-monitor/pkg/alert"
 	"github.com/numbergroup/eth-monitor/pkg/config"
+	"github.com/numbergroup/eth-monitor/pkg/monitor"
 )
 
 type RPCBlockNumber interface {
@@ -18,21 +19,25 @@ type RPCBlockNumber interface {
 type BlockNumberMonitor struct {
 	alertChannels    []alert.Alert
 	conf             *config.Config
-	client           ETHRPC
+	client           RPCBlockNumber
 	endpoint         config.Endpoint
 	lastBlockNumber  uint64
 	lastNewBlockTime time.Time
 	log              logrus.Ext1FieldLogger
 }
 
-func NewBlockNumberMonitor(conf *config.Config, alertChannels []alert.Alert, rpcClient RPCBlockNumber, endpoint config.Endpoint) (Monitor, error) {
-	return &BlockNumberMonitor{
+func NewBlockNumberMonitor(conf *config.Config, alertChannels []alert.Alert, rpcClient RPCBlockNumber, endpoint config.Endpoint) (monitor.Monitor, error) {
+	out := &BlockNumberMonitor{
 		alertChannels: alertChannels,
 		conf:          conf,
 		client:        rpcClient,
 		endpoint:      endpoint,
-		log:           conf.Log,
-	}, nil
+	}
+	out.log = conf.Log.WithFields(logrus.Fields{
+		"name":     out.Name(),
+		"endpoint": endpoint.Name,
+	})
+	return out, nil
 }
 
 func (m *BlockNumberMonitor) checkNewBlock(ctx context.Context) error {
@@ -59,33 +64,30 @@ func (m *BlockNumberMonitor) checkNewBlock(ctx context.Context) error {
 }
 
 func (m *BlockNumberMonitor) Name() string {
-	return "BlockNumberMonitor::" + m.endpoint.Name
+	return "execution::BlockNumberMonitor::" + m.endpoint.Name
 }
 
 func (m *BlockNumberMonitor) Run(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			m.conf.Log.WithField("name", m.endpoint.Name).Info("monitoring stopped")
+			m.log.Info("monitoring stopped")
 			return
 		default:
 			if err := m.checkNewBlock(ctx); err != nil {
-				m.conf.Log.WithError(err).Error("health check failed, raising alert")
-				for _, alertChannel := range m.alertChannels {
-					alertErr := alertChannel.Raise(ctx, alert.Message{
-						Message:  err.Error(),
-						Severity: alert.Error,
-						Name:     m.endpoint.Name,
-					})
-					if alertErr != nil {
-						m.conf.Log.WithError(alertErr).Error("failed to raise alert")
-					}
+				m.log.WithError(err).Error("health check failed, raising alert")
+				alertErr := alert.RaiseAll(ctx, m.log, m.alertChannels, alert.Message{
+					Message:  err.Error(),
+					Severity: alert.Error,
+					Name:     m.endpoint.Name,
+				})
+				if alertErr != nil {
+					m.conf.Log.WithError(alertErr).Error("failed to raise alert")
 				}
 
 			} else {
-				m.conf.Log.WithFields(logrus.Fields{
-					"block": m.lastBlockNumber,
-					"name":  m.endpoint.Name}).Info("Endpoint is healthy")
+				m.log.WithFields(logrus.Fields{
+					"block": m.lastBlockNumber}).Info("Endpoint is healthy")
 			}
 		}
 
@@ -93,7 +95,7 @@ func (m *BlockNumberMonitor) Run(ctx context.Context) {
 		case <-time.After(m.endpoint.PollDuration):
 			continue
 		case <-ctx.Done():
-			m.conf.Log.WithField("name", m.endpoint.Name).Info("monitoring stopped")
+			m.log.Info("monitoring stopped")
 			return
 		}
 	}

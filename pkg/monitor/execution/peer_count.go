@@ -9,6 +9,7 @@ import (
 
 	"github.com/numbergroup/eth-monitor/pkg/alert"
 	"github.com/numbergroup/eth-monitor/pkg/config"
+	"github.com/numbergroup/eth-monitor/pkg/monitor"
 )
 
 // RPCPeerCount defines the minimal RPC surface needed for peer monitoring.
@@ -26,7 +27,7 @@ type PeerCountMonitor struct {
 	log                 logrus.Ext1FieldLogger
 }
 
-func NewPeerCountMonitor(conf *config.Config, alertChannels []alert.Alert, rpcClient RPCPeerCount, endpoint config.Endpoint) (Monitor, error) {
+func NewPeerCountMonitor(conf *config.Config, alertChannels []alert.Alert, rpcClient RPCPeerCount, endpoint config.Endpoint) (monitor.Monitor, error) {
 	return &PeerCountMonitor{
 		alertChannels:       alertChannels,
 		conf:                conf,
@@ -54,7 +55,7 @@ func (m *PeerCountMonitor) checkPeerCount(ctx context.Context) error {
 	return nil
 }
 
-func (m *PeerCountMonitor) Name() string { return "PeerCountMonitor::" + m.endpoint.Name }
+func (m *PeerCountMonitor) Name() string { return "execution::PeerCountMonitor::" + m.endpoint.Name }
 
 func (m *PeerCountMonitor) Run(ctx context.Context) {
 	for {
@@ -65,15 +66,13 @@ func (m *PeerCountMonitor) Run(ctx context.Context) {
 		default:
 			if err := m.checkPeerCount(ctx); err != nil {
 				m.conf.Log.WithError(err).Error("health check failed, raising alert")
-				for _, alertChannel := range m.alertChannels {
-					alertErr := alertChannel.Raise(ctx, alert.Message{
-						Message:  err.Error(),
-						Severity: alert.Error,
-						Name:     m.endpoint.Name,
-					})
-					if alertErr != nil {
-						m.conf.Log.WithError(alertErr).Error("failed to raise alert")
-					}
+				alertErr := alert.RaiseAll(ctx, m.conf.Log, m.alertChannels, alert.Message{
+					Message:  err.Error(),
+					Severity: alert.Error,
+					Name:     m.endpoint.Name,
+				})
+				if alertErr != nil {
+					m.conf.Log.WithError(alertErr).Error("failed to raise alert")
 				}
 			} else {
 				m.conf.Log.WithFields(logrus.Fields{
