@@ -39,7 +39,7 @@ func TestCheckNewBlock_FirstIncrease_OK(t *testing.T) {
 	ep := config.Endpoint{NewBlockMaxDuration: 5 * time.Second}
 	m := newTestMonitor(t, rpc, ep)
 
-	if err := m.checkNewBlock(context.Background()); err != nil {
+	if err := m.checkNewBlock(t.Context()); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	if m.lastBlockNumber != 5 {
@@ -57,7 +57,7 @@ func TestCheckNewBlock_UnchangedWithinThreshold_OK(t *testing.T) {
 	m.lastBlockNumber = 10
 	m.lastNewBlockTime = time.Now().Add(-500 * time.Millisecond)
 
-	if err := m.checkNewBlock(context.Background()); err != nil {
+	if err := m.checkNewBlock(t.Context()); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
 }
@@ -69,7 +69,7 @@ func TestCheckNewBlock_UnchangedExceedsThreshold_Error(t *testing.T) {
 	m.lastBlockNumber = 10
 	m.lastNewBlockTime = time.Now().Add(-10 * time.Second)
 
-	err := m.checkNewBlock(context.Background())
+	err := m.checkNewBlock(t.Context())
 	if err == nil {
 		t.Fatal("expected error due to no new block, got nil")
 	}
@@ -85,7 +85,7 @@ func TestCheckNewBlock_Decrease_Error(t *testing.T) {
 	m.lastBlockNumber = 20
 	m.lastNewBlockTime = time.Now().Add(-100 * time.Millisecond)
 
-	err := m.checkNewBlock(context.Background())
+	err := m.checkNewBlock(t.Context())
 	if err == nil {
 		t.Fatal("expected error on decreased block number, got nil")
 	}
@@ -102,7 +102,7 @@ func TestCheckNewBlock_RPCError_Propagates(t *testing.T) {
 	ep := config.Endpoint{NewBlockMaxDuration: 5 * time.Second}
 	m := newTestMonitor(t, rpc, ep)
 
-	err := m.checkNewBlock(context.Background())
+	err := m.checkNewBlock(t.Context())
 	if err == nil {
 		t.Fatal("expected error from RPC, got nil")
 	}
