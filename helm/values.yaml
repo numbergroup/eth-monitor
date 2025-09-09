@@ -1,0 +1,67 @@
+
+fullnameOverride: ""
+nameOverride: ""
+
+namespace: default
+
+verbosity: "info"
+
+
+command: monitor
+args:
+- --config
+- /etc/eth-monitor/config.yaml
+
+image:
+  registry: docker.io
+  repository: ethcf/eth-monitor
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+environment:
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# The data for config.yaml
+config:
+  endpoints:
+  - name: example-endpoint
+    url: https://example.com/api
+    new_block_max_duration: 90s
+    min_peers: 5
+    poll_duration: 15s
+    type: execution
+    pagerduty:
+      enabled: true
+      routing_key: example-routing-key
+      service: example-service
+    slack:
+      enabled: true
+      # use either webhook_url or token/channel combo, not both
+      webhook_url: https://hooks.slack.com/services/example/webhook
+      channel: 'channel id'
+      token: example-slack-token
+  - name: another-consensus-endpoint
+    type: consensus
+    url: https://another.com/api
+    new_block_max_duration: 120s
+    min_peers: 3
+    poll_duration: 20s
+    # Pagerduty and Slack configurations can be omitted if you want to use the global settings below
+
+  pagerduty:
+    enabled: true
+    routing_key: example-routing-key
+    service: example-service
+  slack:
+    enabled: true
+    # use either webhook_url or token/channel combo, not both
+    webhook_url: https://hooks.slack.com/services/example/webhook
+    channel: 'channel id'
+    token: example-slack-token 
