@@ -19,12 +19,21 @@ func main() {
 
 	confFile := flag.String("conf", "./config.yaml", "path to the configuration file")
 
+	var (
+		conf *config.Config
+		err  error
+	)
 	flag.Parse()
-
-	conf, err := config.LoadConfig(*confFile)
-	if err != nil {
-		print(err.Error())
-		os.Exit(1)
+	if confFile == nil || *confFile == "" {
+		conf, err = config.LoadConfig([]byte(os.Getenv("ETH_MONITOR_CONFIG_DATA")))
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		conf, err = config.LoadConfigFromFile(*confFile)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	waitGroup := &sync.WaitGroup{}

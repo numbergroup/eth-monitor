@@ -47,17 +47,21 @@ type Config struct {
 	Log logrus.Ext1FieldLogger `yaml:"-" json:"-"` // Log field is not serialized to YAML, used for logging
 }
 
-func LoadConfig(file string) (*Config, error) {
+func LoadConfigFromFile(file string) (*Config, error) {
 	data, err := os.ReadFile(file)
 	if err != nil {
 		return nil, err
 	}
+	return LoadConfig(data)
+}
+
+func LoadConfig(data []byte) (*Config, error) {
 	conf := &Config{}
-	err = yaml.Unmarshal(data, conf)
+	err := yaml.Unmarshal(data, conf)
 	if err != nil {
 		err = json.Unmarshal(data, conf)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to parse config file")
+			return nil, errors.Wrap(err, "failed to parse configuration")
 		}
 		return nil, err
 	}
